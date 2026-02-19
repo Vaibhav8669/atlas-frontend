@@ -24,7 +24,8 @@ export default function CreateTechnicianDialog({ onSuccess }: Props) {
     const [success, setSuccess] = useState(false)
 
     const [form, setForm] = useState({
-        name: '',
+        firstName: '',
+        lastName: '',
         email: '',
         mobile: '',
         role: 'technician',
@@ -35,7 +36,15 @@ export default function CreateTechnicianDialog({ onSuccess }: Props) {
         setLoading(true)
 
         try {
-            const response = await createTechnician(form)
+            // Combine first and last name for API
+            const payload = {
+                name: `${form.firstName} ${form.lastName}`.trim(),
+                email: form.email,
+                mobile: form.mobile,
+                role: form.role,
+            }
+
+            const response = await createTechnician(payload)
             console.log('Technician created:', response)
             setSuccess(true)
             onSuccess?.()
@@ -52,7 +61,8 @@ export default function CreateTechnicianDialog({ onSuccess }: Props) {
         setSuccess(false)
         setError(null)
         setForm({
-            name: '',
+            firstName: '',
+            lastName: '',
             email: '',
             mobile: '',
             role: 'technician',
@@ -62,7 +72,7 @@ export default function CreateTechnicianDialog({ onSuccess }: Props) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline">Create Technician</Button>
+                <Button variant="default">Create Technician</Button>
             </DialogTrigger>
 
             <DialogContent className="max-w-md">
@@ -73,15 +83,27 @@ export default function CreateTechnicianDialog({ onSuccess }: Props) {
                         </DialogHeader>
 
                         <div className="space-y-4">
-                            <div>
-                                <Label>Name</Label>
-                                <Input
-                                    value={form.name}
-                                    onChange={e =>
-                                        setForm({ ...form, name: e.target.value })
-                                    }
-                                    placeholder="John Doe"
-                                />
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <Label>First Name</Label>
+                                    <Input
+                                        value={form.firstName}
+                                        onChange={e =>
+                                            setForm({ ...form, firstName: e.target.value })
+                                        }
+                                        placeholder="John"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Last Name</Label>
+                                    <Input
+                                        value={form.lastName}
+                                        onChange={e =>
+                                            setForm({ ...form, lastName: e.target.value })
+                                        }
+                                        placeholder="Doe"
+                                    />
+                                </div>
                             </div>
 
                             <div>

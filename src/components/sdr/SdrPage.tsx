@@ -1,12 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useVirtual } from 'react-virtual'
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,32 +11,23 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Database, Search, X, RefreshCw } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Loader2, Search, X, RefreshCw, Database } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useSdrStore, type SdrRecord } from '@/stores/sdr-store'
 import { getSdrDump, parseSdrCsv } from '@/lib/sdr'
 
-export function SdrDumpDialog() {
+export function SdrPage() {
     const { toast } = useToast()
-    const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
+    const tableContainerRef = useRef<HTMLDivElement>(null)
 
     const { sdrData, setSdrData, setLoading: setStoreLoading } = useSdrStore()
 
-    // Refs for virtual scrolling
-    const tableContainerRef = useRef<HTMLDivElement>(null)
-
     useEffect(() => {
-        console.log('SDR Data in store:', sdrData.length)
-    }, [sdrData])
-
-    // Auto-fetch EVERY TIME dialog opens
-    useEffect(() => {
-        if (open) {
-            handleFetchSdr()
-        }
-    }, [open])
+        handleFetchSdr() // Auto-fetch on mount
+    }, [])
 
     const handleFetchSdr = async () => {
         setLoading(true)
@@ -51,9 +35,7 @@ export function SdrDumpDialog() {
 
         try {
             const response = await getSdrDump()
-            console.log('Raw response:', response)
             const parsedData = parseSdrCsv(response.data)
-            console.log('Parsed data:', parsedData.length)
             setSdrData(parsedData)
 
             toast({
@@ -61,7 +43,6 @@ export function SdrDumpDialog() {
                 description: `Loaded ${parsedData.length} SDR records`,
             })
 
-            // Force virtualizer to recalculate after data loads
             setTimeout(() => {
                 if (tableContainerRef.current) {
                     window.dispatchEvent(new Event('resize'))
@@ -81,7 +62,6 @@ export function SdrDumpDialog() {
         }
     }
 
-    // Filter data based on search
     const filteredData = sdrData.filter(record => {
         if (!searchTerm) return true
         const searchLower = searchTerm.toLowerCase()
@@ -95,15 +75,14 @@ export function SdrDumpDialog() {
         )
     })
 
-    // Virtual scrolling setup
-    const rowVirtualizer = useVirtual({
-        size: filteredData.length,
-        parentRef: tableContainerRef,
+    // ✅ FIXED: useVirtualizer instead of useVirtual
+    const rowVirtualizer = useVirtualizer({
+        count: filteredData.length,
+        getScrollElement: () => tableContainerRef.current,
         estimateSize: useCallback(() => 45, []),
         overscan: 10
     })
 
-    // Column widths
     const columnWidths = {
         sdrCode: '180px',
         issueType: '100px',
@@ -117,21 +96,30 @@ export function SdrDumpDialog() {
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                    <Database className="h-4 w-4 mr-2" />
-                    SDR Master
-                </Button>
-            </DialogTrigger>
+        <div className="space-y-6">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Database className="h-5 w-5" />
+                        <CardTitle>SDR Master Data</CardTitle>
+                    </div>
+                    <Button
+                        onClick={handleFetchSdr}
+                        disabled={loading}
+                        size="sm"
+                        variant="outline"
+                    >
+                        {loading ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                        )}
+                        Refresh
+                    </Button>
+                </CardHeader>
 
-            <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto p-0">
-                <DialogHeader className="p-6 pb-2">
-                    <DialogTitle>SDR Master Data</DialogTitle>
-                </DialogHeader>
-
-                <div className="px-6 pb-6 space-y-4">
-                    {/* Controls */}
+                <CardContent className="space-y-4">
+                    {/* Search */}
                     <div className="flex justify-between items-center">
                         <div className="flex gap-2 flex-1 max-w-sm">
                             <div className="relative flex-1">
@@ -154,22 +142,6 @@ export function SdrDumpDialog() {
                                 )}
                             </div>
                         </div>
-
-                        <div className="flex gap-2">
-                            <Button
-                                onClick={handleFetchSdr}
-                                disabled={loading}
-                                size="sm"
-                                variant="outline"
-                            >
-                                {loading ? (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                ) : (
-                                    <RefreshCw className="h-4 w-4 mr-2" />
-                                )}
-                                Refresh
-                            </Button>
-                        </div>
                     </div>
 
                     {/* Stats */}
@@ -180,15 +152,12 @@ export function SdrDumpDialog() {
                         </div>
                     )}
 
-                    {/* Loading State */}
-                    {loading && (
+                    {/* Table */}
+                    {loading ? (
                         <div className="flex justify-center items-center py-12">
                             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                         </div>
-                    )}
-
-                    {/* Virtualized Table with Horizontal Scroll */}
-                    {!loading && filteredData.length > 0 ? (
+                    ) : filteredData.length > 0 ? (
                         <div
                             ref={tableContainerRef}
                             className="border rounded-lg overflow-auto"
@@ -197,28 +166,28 @@ export function SdrDumpDialog() {
                             <Table className="w-full" style={{ tableLayout: 'fixed' }}>
                                 <TableHeader className="sticky top-0 bg-background z-10">
                                     <TableRow className="bg-muted/50">
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.sdrCode }}>SDR Code</TableHead>
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.issueType }}>Issue Type</TableHead>
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.model }}>Model</TableHead>
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.symptom }}>Symptom</TableHead>
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.defect }}>Defect</TableHead>
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.repair }}>Repair</TableHead>
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.resolution }}>Resolution</TableHead>
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.part }}>Part?</TableHead>
-                                        <TableHead className="text-left whitespace-nowrap px-4 py-3" style={{ width: columnWidths.sdrNumber }}>SDR #</TableHead>
+                                        <TableHead style={{ width: columnWidths.sdrCode }}>SDR Code</TableHead>
+                                        <TableHead style={{ width: columnWidths.issueType }}>Issue Type</TableHead>
+                                        <TableHead style={{ width: columnWidths.model }}>Model</TableHead>
+                                        <TableHead style={{ width: columnWidths.symptom }}>Symptom</TableHead>
+                                        <TableHead style={{ width: columnWidths.defect }}>Defect</TableHead>
+                                        <TableHead style={{ width: columnWidths.repair }}>Repair</TableHead>
+                                        <TableHead style={{ width: columnWidths.resolution }}>Resolution</TableHead>
+                                        <TableHead style={{ width: columnWidths.part }}>Part</TableHead>
+                                        <TableHead style={{ width: columnWidths.sdrNumber }}>SDR</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody
                                     style={{
-                                        height: `${rowVirtualizer.totalSize}px`,
+                                        height: `${rowVirtualizer.getTotalSize()}px`, // ✅ FIXED
                                         position: 'relative'
                                     }}
                                 >
-                                    {rowVirtualizer.virtualItems.map((virtualRow) => {
+                                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                                         const record = filteredData[virtualRow.index]
                                         return (
                                             <TableRow
-                                                key={virtualRow.index}
+                                                key={virtualRow.key}
                                                 style={{
                                                     position: 'absolute',
                                                     top: 0,
@@ -229,35 +198,35 @@ export function SdrDumpDialog() {
                                                 }}
                                                 className="hover:bg-muted/50"
                                             >
-                                                <TableCell className="font-mono text-xs whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.sdrCode }}>
+                                                <TableCell className="font-mono text-xs" style={{ width: columnWidths.sdrCode }}>
                                                     {record.sdr_code}
                                                 </TableCell>
-                                                <TableCell className="whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.issueType }}>
+                                                <TableCell style={{ width: columnWidths.issueType }}>
                                                     <Badge variant="outline" className="text-xs">
                                                         {record.issue_type}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="text-xs whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.model }}>
+                                                <TableCell className="text-xs" style={{ width: columnWidths.model }}>
                                                     {record.model_name}
                                                 </TableCell>
-                                                <TableCell className="text-xs whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.symptom }} title={record.symptom_desc}>
+                                                <TableCell className="text-xs" style={{ width: columnWidths.symptom }} title={record.symptom_desc}>
                                                     {record.symptom_desc}
                                                 </TableCell>
-                                                <TableCell className="text-xs whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.defect }} title={record.defect_desc}>
+                                                <TableCell className="text-xs" style={{ width: columnWidths.defect }} title={record.defect_desc}>
                                                     {record.defect_desc}
                                                 </TableCell>
-                                                <TableCell className="text-xs whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.repair }} title={record.repair_desc}>
+                                                <TableCell className="text-xs" style={{ width: columnWidths.repair }} title={record.repair_desc}>
                                                     {record.repair_desc}
                                                 </TableCell>
-                                                <TableCell className="text-xs whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.resolution }}>
+                                                <TableCell className="text-xs" style={{ width: columnWidths.resolution }}>
                                                     {record.resolution_type}
                                                 </TableCell>
-                                                <TableCell className="whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.part }}>
+                                                <TableCell style={{ width: columnWidths.part }}>
                                                     <Badge variant={record.is_part_consumption === '1' ? 'default' : 'secondary'} className="text-xs">
                                                         {record.is_part_consumption === '1' ? 'Yes' : 'No'}
                                                     </Badge>
                                                 </TableCell>
-                                                <TableCell className="font-mono text-xs whitespace-nowrap text-left px-4 py-2" style={{ width: columnWidths.sdrNumber }}>
+                                                <TableCell className="font-mono text-xs" style={{ width: columnWidths.sdrNumber }}>
                                                     {record.sdr_master_number}
                                                 </TableCell>
                                             </TableRow>
@@ -266,13 +235,13 @@ export function SdrDumpDialog() {
                                 </TableBody>
                             </Table>
                         </div>
-                    ) : !loading && sdrData.length === 0 ? (
+                    ) : (
                         <div className="text-center py-12 text-muted-foreground">
                             No SDR data available. Click Refresh to load.
                         </div>
-                    ) : null}
-                </div>
-            </DialogContent>
-        </Dialog>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
     )
 }

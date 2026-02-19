@@ -16,9 +16,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-import { Loader2, CheckCircle2, Calendar, Clock, Users } from 'lucide-react'
+import { Loader2, CheckCircle2 } from 'lucide-react'
 import { assignCase } from '@/lib/assigncase'
-import { getAllUsers, type User } from '../lib/users'
+import { getAllUsers, type User as UserType } from '../lib/users'
+import { Separator } from '@/components/ui/separator'
+import { Card } from '@/components/ui/card'
 
 type Props = {
     caseId: string
@@ -34,9 +36,9 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
     const [error, setError] = useState<string | null>(null)
-    const [selectedTechnician, setSelectedTechnician] = useState<User | null>(null)
+    const [selectedTechnician, setSelectedTechnician] = useState<UserType | null>(null)
 
-    const [technicians, setTechnicians] = useState<User[]>([])
+    const [technicians, setTechnicians] = useState<UserType[]>([])
     const [usersLoading, setUsersLoading] = useState(false)
     const [usersError, setUsersError] = useState<string | null>(null)
 
@@ -105,12 +107,11 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
                 scheduledAtEpoch = Math.floor(new Date(dateTimeString).getTime() / 1000)
             }
 
-            console.log('🚀 Calling assignCase with:', { caseId, assignee, scheduledAtEpoch })
+            console.log('Calling assignCase with:', { caseId, assignee, scheduledAtEpoch })
 
             const result = await assignCase(caseId, assignee, scheduledAtEpoch)
-            console.log('✅ Assign result:', result)
+            console.log('Assign result:', result)
 
-            // Pass back the updated data
             if (onSuccess) {
                 onSuccess({
                     case_id: caseId,
@@ -122,7 +123,7 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
             setSuccess(true)
 
         } catch (err: any) {
-            console.error('❌ Assignment failed:', err)
+            console.error('Assignment failed:', err)
             setError(err.message || 'Failed to assign case')
         } finally {
             setLoading(false)
@@ -132,7 +133,6 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
     function resetAndClose() {
         setOpen(false)
         setSuccess(false)
-        // Reset form states after a small delay to avoid UI flicker
         setTimeout(() => {
             setAssignee('')
             setScheduledDate('')
@@ -147,40 +147,51 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
+                <Button size="default" className="bg-blue-600 hover:bg-blue-700 text-white">
                     Assign
                 </Button>
             </DialogTrigger>
 
-            <DialogContent className="max-w-sm">
+            <DialogContent className="max-w-md p-6">
                 {!success ? (
                     <>
-                        <DialogHeader>
-                            <DialogTitle>Assign Case</DialogTitle>
+                        <DialogHeader className="pb-4">
+                            <DialogTitle className="text-xl">Assign Case</DialogTitle>
                         </DialogHeader>
 
-                        <div className="space-y-4">
-                            <div>
-                                <Label>Case ID</Label>
-                                <Input value={caseId} disabled className="font-mono text-xs" />
-                            </div>
+                        <div className="space-y-6">
+                            {/* Case ID Card */}
+                            <Card className="bg-muted/30 p-4 border-dashed">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <span className="text-xs font-bold text-primary">ID</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-muted-foreground">Case ID</p>
+                                        <p className="font-mono text-sm font-semibold">{caseId}</p>
+                                    </div>
+                                </div>
+                            </Card>
 
-                            <div className="space-y-2">
-                                <Label className="flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
+                            <Separator />
+
+                            {/* Technician Selection */}
+                            <div className="space-y-3">
+                                <Label className="text-base font-semibold">
                                     Select Technician
                                 </Label>
 
                                 {usersLoading ? (
-                                    <div className="flex items-center justify-center py-4">
-                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                    <div className="flex items-center justify-center py-6 bg-muted/20 rounded-lg">
+                                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                     </div>
                                 ) : usersError ? (
-                                    <div className="text-sm text-destructive p-2 border rounded-lg">
-                                        Failed to load technicians.
+                                    <div className="text-sm text-destructive p-4 border border-destructive/20 rounded-lg bg-destructive/5">
+                                        <p className="mb-2">Failed to load technicians.</p>
                                         <Button
-                                            variant="link"
-                                            className="px-1 h-auto text-destructive"
+                                            variant="outline"
+                                            size="sm"
+                                            className="border-destructive text-destructive hover:bg-destructive/10"
                                             onClick={fetchTechnicians}
                                         >
                                             Retry
@@ -191,8 +202,8 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
                                         value={assignee}
                                         onValueChange={setAssignee}
                                     >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a technician" />
+                                        <SelectTrigger className="h-11">
+                                            <SelectValue placeholder="Choose a technician" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {technicians.length > 0 ? (
@@ -200,8 +211,9 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
                                                     <SelectItem
                                                         key={tech.user_id}
                                                         value={tech.user_id}
+                                                        className="py-3"
                                                     >
-                                                        <div className="flex flex-col">
+                                                        <div className="flex flex-col gap-0.5">
                                                             <span className="font-medium">{tech.name}</span>
                                                             <span className="text-xs text-muted-foreground">
                                                                 {tech.email}
@@ -210,7 +222,7 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
                                                     </SelectItem>
                                                 ))
                                             ) : (
-                                                <div className="px-2 py-4 text-center text-sm text-muted-foreground">
+                                                <div className="px-2 py-6 text-center text-sm text-muted-foreground">
                                                     No technicians available
                                                 </div>
                                             )}
@@ -219,48 +231,60 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
                                 )}
 
                                 {selectedTechnician && (
-                                    <div className="mt-2 p-2 bg-muted/50 rounded-lg">
-                                        <p className="text-xs font-medium">Selected:</p>
-                                        <p className="text-sm">{selectedTechnician.name}</p>
-                                        <p className="text-xs text-muted-foreground">{selectedTechnician.email}</p>
+                                    <div className="mt-3 p-3 bg-primary/5 rounded-lg border border-primary/10">
+                                        <p className="text-xs font-medium text-primary mb-1">Selected Technician</p>
+                                        <div>
+                                            <p className="text-sm font-medium">{selectedTechnician.name}</p>
+                                            <p className="text-xs text-muted-foreground">{selectedTechnician.email}</p>
+                                        </div>
                                     </div>
                                 )}
 
                                 {!usersLoading && !usersError && technicians.length > 0 && (
-                                    <p className="text-xs text-muted-foreground">
-                                        {technicians.length} technician(s) available
+                                    <p className="text-xs text-muted-foreground italic">
+                                        {technicians.length} active technician(s) available
                                     </p>
                                 )}
                             </div>
 
-                            <div className="space-y-2">
-                                <Label>Schedule (Optional)</Label>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="relative">
+                            <Separator />
+
+                            {/* Schedule Section */}
+                            <div className="space-y-3">
+                                <Label className="text-base font-semibold">
+                                    Schedule (Optional)
+                                </Label>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs text-muted-foreground">Date</Label>
                                         <Input
                                             type="date"
                                             value={scheduledDate}
                                             min={currentDate}
                                             onChange={e => setScheduledDate(e.target.value)}
-                                            className="pr-8"
+                                            className="h-10"
                                         />
                                     </div>
-                                    <div className="relative">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs text-muted-foreground">Time</Label>
                                         <Input
                                             type="time"
                                             value={scheduledTime}
                                             onChange={e => setScheduledTime(e.target.value)}
-                                            className="pr-8"
+                                            className="h-10"
                                             step="60"
                                         />
                                     </div>
                                 </div>
 
                                 {timeError && (
-                                    <p className="text-xs text-destructive">{timeError}</p>
+                                    <p className="text-xs text-destructive flex items-center gap-1 bg-destructive/5 p-2 rounded">
+                                        {timeError}
+                                    </p>
                                 )}
 
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
                                     {scheduledDate === currentDate
                                         ? `Select a time after ${currentTime} for today`
                                         : 'Leave empty to assign immediately'
@@ -269,11 +293,15 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
                             </div>
 
                             {error && (
-                                <p className="text-sm text-destructive">{error}</p>
+                                <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20">
+                                    <p className="text-sm text-destructive">
+                                        {error}
+                                    </p>
+                                </div>
                             )}
 
                             <Button
-                                className="w-full"
+                                className="w-full h-11 text-base font-medium mt-4"
                                 onClick={handleAssign}
                                 disabled={loading || !assignee || (scheduledDate && scheduledTime ? !!timeError : false)}
                             >
@@ -286,21 +314,32 @@ export default function AssignCaseDialog({ caseId, onSuccess }: Props) {
                     </>
                 ) : (
                     <>
-                        <DialogHeader className="text-center">
-                            <DialogTitle className="flex flex-col items-center gap-2">
-                                <CheckCircle2 className="h-12 w-12 text-green-600" />
-                                {scheduledDate && scheduledTime ? 'Case Scheduled' : 'Case Assigned'}
+                        <DialogHeader className="text-center pb-4">
+                            <DialogTitle className="flex flex-col items-center gap-4">
+                                <div className="h-20 w-20 rounded-full bg-green-100 flex items-center justify-center">
+                                    <CheckCircle2 className="h-10 w-10 text-green-600" />
+                                </div>
+                                <span className="text-2xl">
+                                    {scheduledDate && scheduledTime ? 'Case Scheduled!' : 'Case Assigned!'}
+                                </span>
                             </DialogTitle>
                         </DialogHeader>
 
-                        <p className="text-center text-sm text-muted-foreground">
-                            {scheduledDate && scheduledTime
-                                ? `The case has been scheduled for ${new Date(scheduledDate).toLocaleDateString()} at ${scheduledTime}.`
-                                : `The case has been assigned to ${selectedTechnician?.name || assignee}.`
-                            }
-                        </p>
+                        <div className="bg-muted/30 p-4 rounded-lg text-center space-y-2">
+                            <p className="text-sm text-muted-foreground">
+                                {scheduledDate && scheduledTime
+                                    ? `The case has been scheduled for ${new Date(scheduledDate).toLocaleDateString('en-US', {
+                                        weekday: 'long',
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })} at ${scheduledTime}.`
+                                    : `The case has been assigned to ${selectedTechnician?.name || assignee}.`
+                                }
+                            </p>
+                        </div>
 
-                        <Button className="w-full mt-4" onClick={resetAndClose}>
+                        <Button className="w-full mt-6 h-11" onClick={resetAndClose}>
                             Done
                         </Button>
                     </>
